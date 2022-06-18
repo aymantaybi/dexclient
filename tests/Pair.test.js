@@ -1,21 +1,19 @@
-const Web3 = require("web3");
-const Pair = require("../src/modules/Pair").default;
+const DexClient = require("../src").default;
+
+const routerAddress = "0x7d0556d55ca1a92708681e2e231733ebd922597d";
+const factoryAddress = "0xb255d6a720bb7c39fee173ce22113397119cb930";
 
 const { websocketProvider, privateKey } = process.env;
 
-const options = { reconnect: { auto: true, delay: 10, maxAttempts: 10, onTimeout: false } };
-
-const web3 = new Web3(new Web3.providers.WebsocketProvider(websocketProvider, options));
-
-const pair = new Pair({ web3, address: "0x2ecb08f87f075b5769fe543d0e52e40140575ea7" });
+const katanaClient = new DexClient({ websocketProvider, routerAddress, factoryAddress });
 
 describe('Pair.ts', () => {
 
   it('should load Pair infos', async () => {
 
-    await pair.load();
+    await katanaClient.addPair("0x2ecb08f87f075b5769fe543d0e52e40140575ea7");
 
-    expect(pair.symbol).toEqual('WETH-WRON');
+    expect(katanaClient.getPair("0x2ecb08f87f075b5769fe543d0e52e40140575ea7").symbol).toEqual('WETH-WRON');
 
   })
 
