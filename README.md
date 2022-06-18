@@ -73,14 +73,14 @@ Add an Account with some tokens :
 })()
 ```
 Output :
-```javascript
+```
 [ 14 : 17 : 53 ][ INFO ] Account balance : 9.602086118228354928 
 [ 14 : 17 : 53 ][ INFO ] Token Added : WETH 
 [ 14 : 17 : 53 ][ INFO ] Token Added : BUSD
 BUSD,53,18
 ```
 Execute a swap or any transaction changing the tokens balance :
-```javascript
+```
 [ 14 : 22 : 23 ][ UPDATE ] Symbol : WETH | Balance : 0.495962285261187137 
 [ 14 : 22 : 23 ][ UPDATE ] Symbol : BUSD | Balance : 256.081360856610278574 
 [ 14 : 22 : 23 ][ UPDATE ] Account balance : 9.601533408228354928 
