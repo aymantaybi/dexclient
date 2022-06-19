@@ -1,6 +1,7 @@
 {
   "name": "@aymantaybi/dexclient",
   "version": "0.1.6",
+  "repository": "https://github.com/aymantaybi/dexclient",
   "description": "High performance client for all Decentralized Exchanges built on top of EVM compatible Blockchains",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +14,7 @@
     "test": "jest --forceExit --watchAll"
   },
   "author": "Ayman Taybi",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/jest": "^28.1.1",
     "dotenv": "^16.0.1",
