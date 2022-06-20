@@ -10,6 +10,8 @@ import Pair from "./modules/Pair";
 import Subscriber from "./utils/Subscriber";
 import Logger from "./utils/Logger";
 
+import Account from "./Account";
+
 interface DexClientConstructor {
     websocketProvider: string,
     routerAddress: string,
@@ -25,8 +27,7 @@ export default class DexClient {
     pairs: { [key: string]: Pair };
     subscriber: Subscriber;
     logger: Logger;
-    nonce: number;
-    balance: string;
+    account: Account;
 
     constructor({ websocketProvider, routerAddress, factoryAddress }: DexClientConstructor) {
 
@@ -35,11 +36,10 @@ export default class DexClient {
         this.factory = new Factory({ web3: this.web3, address: factoryAddress });
         this.subscriber = new Subscriber(this.web3);
         this.logger = new Logger();
+        this.account = new Account({ web3: this.web3 });
 
         this.tokens = {};
         this.pairs = {};
-        this.nonce = 0;
-        this.balance = "0";
 
         this.subscriber.listen({ type: "logs", functionName: "Transfer(address,address,uint256)" }, async (log) => {
             var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
@@ -57,20 +57,21 @@ export default class DexClient {
             var reserves = this.web3.eth.abi.decodeParameters(['uint112', 'uint112'], log.data);
             this.pairs[pairAddress].reserves = [reserves["0"], reserves["1"]];
             var { symbol } = this.pairs[pairAddress];
-            this.logger.log("UPDATE", `Pair : ${symbol} | Reserves : [ ${reserves["0"]}, ${reserves["1"]} ]`);
+            //this.logger.log("UPDATE", `Pair : ${symbol} | Reserves : [ ${reserves["0"]}, ${reserves["1"]} ]`);
         });
 
         this.subscriber.listen({ type: "newBlockHeaders" }, async (blockHeader) => {
-            var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
-            if (!walletAddress) return;
+            var address = this.account?.address;
+            if (!address) return;
             var block = await this.web3.eth.getBlock(blockHeader.number, true);
-            var filtredTransactions = block.transactions.filter(transaction => transaction.from == walletAddress);
+            var filtredTransactions = block.transactions.filter(transaction => transaction.from == address);
             if (!filtredTransactions.length) return;
             var { nonce } = filtredTransactions.sort((a, b) => b.nonce - a.nonce)[0];
-            this.nonce = this.nonce > nonce ? this.nonce : nonce;
-            this.balance = await this.getBalance(walletAddress);
-            this.logger.log("UPDATE", `Account Balance : ${this.web3.utils.fromWei(this.balance)}`);
-            this.logger.log("UPDATE", `Transactions count : ${this.nonce}`);
+            this.account.nonce = Math.max(this.account.nonce, nonce);
+            this.account.balance = await this.account.getBalance(address);
+            var { nonce, balance } = this.account;
+            this.logger.log("UPDATE", `Account Balance : ${this.web3.utils.fromWei(balance)}`);
+            this.logger.log("UPDATE", `Transactions count : ${nonce}`);
         });
 
     }
@@ -81,7 +82,15 @@ export default class DexClient {
         var token = await this.tokens[tokenAddress].load();
         var { symbol } = token;
         this.logger.log("INFO", `Token Added : ${symbol}`);
-        return token;
+        return this.getToken(tokenAddress);
+    }
+
+    public getToken(address: string) {
+        var tokenAddress = this.web3.utils.toChecksumAddress(address);
+        return this.tokens[tokenAddress] ? {
+            ...this.tokens[tokenAddress],
+            balance: new Decimal(this.tokens[tokenAddress].balance)
+        } : null;
     }
 
     public async addPair(address: string | string[]) {
@@ -97,30 +106,18 @@ export default class DexClient {
         var { symbol, tokens } = pair;
         await Promise.all(tokens.map(token => this.addToken(token)));
         this.logger.log("INFO", `Pair Added : ${symbol}`);
-        return pair;
+        return this.getPair(pairAddress);
     }
 
-    public async getBalance(address: string) {
-        return await this.web3.eth.getBalance(address);
+    public getPair(address: string) {
+        var pairAddress = this.web3.utils.toChecksumAddress(address);
+        return this.pairs[pairAddress];
     }
 
     public async addAccount(privateKey: string) {
-        this.web3.eth.accounts.wallet.add(privateKey);
-        var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
-        if (!walletAddress) return this.logger.log("ERROR", "Invalid private key");
-        [this.nonce, this.balance] = await Promise.all([this.web3.eth.getTransactionCount(walletAddress, 'pending'), this.getBalance(walletAddress)])
-        this.logger.log("INFO", `Account balance : ${this.web3.utils.fromWei(this.balance)}`);
-        return walletAddress;
-    }
-
-    public getToken(address: string){
-        var tokenAddress = this.web3.utils.toChecksumAddress(address);
-        return this.tokens[tokenAddress];
-    }
-
-    public getPair(address: string){
-        var pairAddress = this.web3.utils.toChecksumAddress(address);
-        return this.pairs[pairAddress];
+        var { address, balance, nonce } = await this.account.load(privateKey);
+        this.logger.log("INFO", `Account balance : ${this.web3.utils.fromWei(balance)}`);
+        return this.account;
     }
 
 }

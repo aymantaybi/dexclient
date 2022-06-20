@@ -68,6 +68,7 @@ export default class Pair {
         this.reserves = [_reserve0, _reserve1];
 
         return {
+            address: this.address,
             symbol: this.symbol,
             tokens: this.tokens,
             reserves: this.reserves,
