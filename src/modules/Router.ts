@@ -45,7 +45,7 @@ export default class Router {
         return amountOut;
     };
 
-    public getReserves(tokenA: string, tokenB: string) {
+    private getReserves(tokenA: string, tokenB: string) {
         var pair = Object.values(this.pairs).find(pair => pair.tokens.includes(tokenA) && pair.tokens.includes(tokenB));
         if (!pair) throw new Error(`No reserves found for tokens : ${[tokenA, tokenB]} `);
         var reserves: Decimal[] = pair.reserves;

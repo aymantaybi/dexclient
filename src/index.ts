@@ -1,6 +1,6 @@
 import Web3 from "web3";
 import Decimal from "decimal.js";
-import Options from "./options";
+import options from "./options";
 
 import Router from "./modules/Router";
 import Factory from "./modules/Factory";
@@ -31,7 +31,7 @@ export default class DexClient {
 
     constructor({ websocketProvider, routerAddress, factoryAddress }: DexClientConstructor) {
 
-        this.web3 = new Web3(new Web3.providers.WebsocketProvider(websocketProvider, Options.provider));
+        this.web3 = new Web3(new Web3.providers.WebsocketProvider(websocketProvider, options.provider));
 
         this.tokens = {};
         this.pairs = {};
@@ -41,9 +41,6 @@ export default class DexClient {
         this.subscriber = new Subscriber(this.web3);
         this.logger = new Logger();
         this.account = new Account({ web3: this.web3 });
-
-        this.tokens = {};
-        this.pairs = {};
 
         this.subscriber.listen({ type: "logs", functionName: "Transfer(address,address,uint256)" }, async (log) => {
 
@@ -94,10 +91,12 @@ export default class DexClient {
 
     public getToken(address: string) {
         var tokenAddress = this.web3.utils.toChecksumAddress(address);
-        return this.tokens[tokenAddress] ? {
+        if (!this.tokens[tokenAddress]) return { address: null, balance: new Decimal(0), decimals: 0, symbol: "" };
+        var { balance, decimals } = this.tokens[tokenAddress];
+        return {
             ...this.tokens[tokenAddress],
-            balance: new Decimal(this.tokens[tokenAddress].balance)
-        } : { address: null, balance: new Decimal(0), decimals: 0, symbol: "" };
+            balance: new Decimal(balance).dividedBy(10 ** decimals)
+        }
     }
 
     public async addPair(address: string | string[]) {
@@ -127,8 +126,6 @@ export default class DexClient {
         return this.account;
     }
 
-
-
     public getPath(tokenIn: string, tokenOut: string) {
         var pair = Object.values(this.pairs).find(pair => pair.tokens.includes(tokenIn) && pair.tokens.includes(tokenOut));
         if (pair) return [tokenIn, tokenOut];
@@ -149,25 +146,44 @@ export default class DexClient {
         });
     }
 
-    public async swap({ amountIn, amountOutMin }: { amountIn: Decimal, amountOutMin: Decimal }, path: string[], to: string, deadline: number, options: any = {}) {
+    public async swap({ amountIn = null, amountOutMin = null, amountOut = null, amountInMax = null }: any, path: string[], to: string, deadline: number, options: any = {}) {
 
         var from = this.account.address;
 
         if (this.web3.utils.toBN(from).isZero()) throw new Error("No Account Added");
 
-        var tokenIn = path[0];
-        var tokenOut = path[path.length - 1];
+        var tokenIn = this.getToken(path[0]);
+        var tokenOut = this.getToken(path[path.length - 1]);
 
-        if (!this.getToken(tokenIn).address || !this.getToken(tokenOut).address) throw new Error("Tokens in path not added");
+        if (!tokenIn.address || !tokenOut.address) throw new Error("Tokens in path not added");
 
-        var amountInWithDecimals = amountIn.times(10 ** this.getToken(tokenIn).decimals);
-        var amountOutMinWithDecimals = amountOutMin.times(10 ** this.getToken(tokenOut).decimals);
-
-        if (amountInWithDecimals.equals(0) || amountInWithDecimals.greaterThan(this.getToken(tokenIn).balance)) throw new Error("Insufficient balance for this trade");
+        if (
+            tokenIn.balance.lessThan(amountIn || 0)
+            ||
+            tokenIn.balance.lessThan(amountInMax || 0)
+        ) throw new Error("Insufficient balance for this trade");
 
         this.router.contract.options.from = from;
 
-        var data = this.router.contract.methods.swapExactTokensForTokens(amountInWithDecimals.toString(), amountOutMinWithDecimals.toString(), path, to, deadline).encodeABI();
+        var method: string = "";
+        var inputs: Decimal[] = [];
+        var message: string = "";
+
+        if (amountIn && amountOutMin) {
+            method = "swapExactTokensForTokens";
+            var amountInWithDecimals = amountIn.times(10 ** tokenIn.decimals);
+            var amountOutMinWithDecimals = amountOutMin.times(10 ** tokenOut.decimals);
+            inputs = [amountInWithDecimals, amountOutMinWithDecimals];
+            message = `Swap ${amountIn} ${tokenIn.symbol} for a minimum of ${amountOutMin} ${tokenOut.symbol} ...`;
+        } else if (amountOut && amountInMax) {
+            method = "swapTokensForExactTokens";
+            var amountOutWithDecimals = amountOut.times(10 ** tokenOut.decimals);
+            var amountInMaxWithDecimals = amountInMax.times(10 ** tokenIn.decimals);
+            inputs = [amountOutWithDecimals, amountInMaxWithDecimals];
+            message = `Swap a maximum of ${amountInMax} ${tokenIn.symbol} for ${amountOut} ${tokenOut.symbol} ...`;
+        }
+
+        var data = this.router.contract.methods[method](...inputs.map(amount => amount.toString()), path, to, deadline).encodeABI();
 
         var nonce = this.account.nonce;
 
@@ -182,12 +198,12 @@ export default class DexClient {
             ...options
         }).catch((e) => {
             this.logger.log("ERROR", "The following error has occurred while sending the transaction : ");
-            console.log(e.message)
-        })
+            //console.log(e.message)
+        });
 
         this.account.nonce += 1;
 
-        this.logger.log("INFO", `Swap ${amountIn} ${this.getToken(tokenIn).symbol} for a minimum of ${amountOutMin} ${this.getToken(tokenOut).symbol} ...`);
+        this.logger.log("INFO", message);
 
         var transaction: any = await this.waitForTransaction((transaction: any) => transaction.from == from && String(transaction.nonce) == String(nonce));
 

@@ -13,21 +13,29 @@ const katanaClient = new DexClient({ websocketProvider, routerAddress, factoryAd
 
 (async () => {
 
-    var walletAddress = await katanaClient.addAccount(privateKey);
+    var account = await katanaClient.addAccount(privateKey);
 
-    await katanaClient.addToken("0x97a9107c1793bc407d6f527b77e7fff4d812bece");
+    await katanaClient.addToken("0xa8754b9fa15fc18bb59458815510e40a12cd2014");
     await katanaClient.addToken("0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5");
 
+    var tokenIn = katanaClient.getToken("0xa8754b9fa15fc18bb59458815510e40a12cd2014");
     var tokenOut = katanaClient.getToken("0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5");
-    var tokenIn = katanaClient.getToken("0x97a9107c1793bc407d6f527b77e7fff4d812bece");
 
     await katanaClient.addPair([tokenIn.address, tokenOut.address]);
 
-    var amountOut = new Decimal(1);
+    var amountIn = tokenIn.balance;
 
     var path = katanaClient.getPath(tokenIn.address, tokenOut.address);
 
+    var [inQuantity, outQuantity] = katanaClient.router.getAmountsOut(amountIn, path);
+
+    var amountOut = outQuantity;
+
     var [inQuantity, outQuantity] = katanaClient.router.getAmountsIn(amountOut, path);
+
+    var amountInMax = inQuantity;
+    
+    var transaction = await katanaClient.swap({ amountOut, amountInMax }, path, account.address, Math.round(Date.now() / 1000) + 86400);
 
     return
 
