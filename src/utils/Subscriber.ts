@@ -4,28 +4,33 @@ import events from "events";
 export default class Subscriber {
 
     web3: Web3;
-    eventEmitter: events;
-    subscriptions: { [key: string]: any };
+    subscriptions: { [key: string]: events };
 
     constructor(web3: Web3) {
         this.web3 = web3;
-        this.eventEmitter = new events.EventEmitter();
-        this.subscriptions = {};
+        this.subscriptions = {
+            "logs": new events.EventEmitter(),
+            "newBlockHeaders": new events.EventEmitter(),
+        };
+        this.web3.eth.subscribe("logs", {}).on("data", (log) => {
+            this.subscriptions.logs.emit(log.topics[0], log);
+        })
+        this.web3.eth.subscribe("newBlockHeaders").on("data", (blockHeader) => {
+            this.subscriptions.newBlockHeaders.emit("data", blockHeader);
+        })
+    }
+
+    subscription(type: string) {
+        return this.subscriptions[type];
     }
 
     listen({ type, functionName }: any, callback: (log: any) => void) {
-
-        var options: any = { topics: [] };
-
-        if (type == "logs") {
-            options.topics[0] = this.web3.eth.abi.encodeEventSignature(functionName);
+        if (functionName) {
+            var event = this.web3.eth.abi.encodeEventSignature(functionName);
+            this.subscription(type).on(event, callback);
+            return;
         }
-
-        this.subscriptions[type] = this.subscriptions[type] || type == "logs" ? this.web3.eth.subscribe(type as any, options) : this.web3.eth.subscribe(type as any);
-
-        this.subscriptions[type].on("data", callback);
-
-        return this.subscriptions[type];
+        this.subscription(type).on("data", callback);
     }
 
 }

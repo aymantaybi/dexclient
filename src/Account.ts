@@ -7,13 +7,13 @@ interface AccountConstractor {
 export default class Account {
 
     web3: Web3;
-    address: string | null;
+    address: string;
     nonce: number;
     balance: string;
 
     constructor({ web3 }: AccountConstractor) {
         this.web3 = web3;
-        this.address = null;
+        this.address = "0x0000000000000000000000000000000000000000";
         this.nonce = 0;
         this.balance = "0";
     }

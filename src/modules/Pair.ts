@@ -65,7 +65,7 @@ export default class Pair {
 
         this.symbol = symbol;
         this.tokens = [token0, token1];
-        this.reserves = [_reserve0, _reserve1];
+        this.reserves = [new Decimal(_reserve0), new Decimal(_reserve1)];
 
         return {
             address: this.address,

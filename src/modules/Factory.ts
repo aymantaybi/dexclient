@@ -19,8 +19,8 @@ export default class Factory {
         this.contract = new this.web3.eth.Contract(ABI as any, address);
     }
 
-    public async getPair(address: string[]) {
-        return await this.contract.methods.getPair(address[0], address[1]).call();
+    public async getPair(tokenA: string, tokenB: string) {
+        return await this.contract.methods.getPair(tokenA, tokenB).call();
     }
 
     public async allPairs(index: number) {
@@ -29,22 +29,6 @@ export default class Factory {
 
     public async allPairsLength() {
         return await this.contract.methods.allPairsLength().call();
-    }
-
-    public async getAllPairs() {
-
-        var pairsLength = await this.allPairsLength();
-
-        var batch = new BatchRequest(this.web3);
-
-        var methodes = Array.from(Array(Number(pairsLength)).keys()).map(index => this.contract.methods.allPairs(index).call);
-
-        for (var methode of methodes) {
-            var request = { methode };
-            batch.add(request);
-        }
-
-        return await batch.executeAsync();
     }
 
 }

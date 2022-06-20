@@ -32,7 +32,11 @@ export default class DexClient {
     constructor({ websocketProvider, routerAddress, factoryAddress }: DexClientConstructor) {
 
         this.web3 = new Web3(new Web3.providers.WebsocketProvider(websocketProvider, Options.provider));
-        this.router = new Router({ web3: this.web3, address: routerAddress });
+
+        this.tokens = {};
+        this.pairs = {};
+
+        this.router = new Router({ web3: this.web3, address: routerAddress, tokens: this.tokens, pairs: this.pairs });
         this.factory = new Factory({ web3: this.web3, address: factoryAddress });
         this.subscriber = new Subscriber(this.web3);
         this.logger = new Logger();
@@ -42,6 +46,7 @@ export default class DexClient {
         this.pairs = {};
 
         this.subscriber.listen({ type: "logs", functionName: "Transfer(address,address,uint256)" }, async (log) => {
+
             var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
             if (!walletAddress || !log.topics.includes(this.web3.utils.padLeft(walletAddress.toLowerCase(), log.topics[0].length - 2))) return;
             var tokenAddress = this.web3.utils.toChecksumAddress(log.address);
@@ -52,6 +57,7 @@ export default class DexClient {
         });
 
         this.subscriber.listen({ type: "logs", functionName: "Sync(uint112,uint112)" }, async (log) => {
+
             var pairAddress = this.web3.utils.toChecksumAddress(log.address);
             if (!this.pairs[pairAddress]) return;
             var reserves = this.web3.eth.abi.decodeParameters(['uint112', 'uint112'], log.data);
@@ -61,8 +67,8 @@ export default class DexClient {
         });
 
         this.subscriber.listen({ type: "newBlockHeaders" }, async (blockHeader) => {
-            var address = this.account?.address;
-            if (!address) return;
+            var { address } = this.account;
+            if (this.web3.utils.toBN(address).isZero()) return;
             var block = await this.web3.eth.getBlock(blockHeader.number, true);
             var filtredTransactions = block.transactions.filter(transaction => transaction.from == address);
             if (!filtredTransactions.length) return;
@@ -78,6 +84,7 @@ export default class DexClient {
 
     public async addToken(address: string) {
         var tokenAddress = this.web3.utils.toChecksumAddress(address);
+        if (this.tokens[tokenAddress]) return this.tokens[tokenAddress];
         this.tokens[tokenAddress] = new Erc20({ web3: this.web3, address: tokenAddress });
         var token = await this.tokens[tokenAddress].load();
         var { symbol } = token;
@@ -90,12 +97,12 @@ export default class DexClient {
         return this.tokens[tokenAddress] ? {
             ...this.tokens[tokenAddress],
             balance: new Decimal(this.tokens[tokenAddress].balance)
-        } : null;
+        } : { address: null, balance: new Decimal(0), decimals: 0, symbol: "" };
     }
 
     public async addPair(address: string | string[]) {
-        var pairAddress = this.web3.utils.toChecksumAddress(Array.isArray(address) ? await this.factory.getPair(address) : address);
-        if (pairAddress == "0x0000000000000000000000000000000000000000") return this.logger.log("ERROR", `No Pair found for this tokens ${address}`);
+        var pairAddress = this.web3.utils.toChecksumAddress(Array.isArray(address) ? await this.factory.getPair(address[0], address[1]) : address);
+        if (this.web3.utils.toBN(pairAddress).isZero()) return this.logger.log("ERROR", `No Pair found for this tokens ${address}`);
         this.pairs[pairAddress] = new Pair({ web3: this.web3, address: pairAddress });
         var pair = await this.pairs[pairAddress].load();
         if (!pair) {
@@ -118,6 +125,77 @@ export default class DexClient {
         var { address, balance, nonce } = await this.account.load(privateKey);
         this.logger.log("INFO", `Account balance : ${this.web3.utils.fromWei(balance)}`);
         return this.account;
+    }
+
+
+
+    public getPath(tokenIn: string, tokenOut: string) {
+        var pair = Object.values(this.pairs).find(pair => pair.tokens.includes(tokenIn) && pair.tokens.includes(tokenOut));
+        if (pair) return [tokenIn, tokenOut];
+    }
+
+    public waitForTransaction(filter = (transaction: any) => true) {
+        return new Promise((resolve, reject) => {
+            var callback = async (blockHeader: any) => {
+                var block = await this.web3.eth.getBlock(blockHeader.number, true);
+                var transaction = block.transactions.find(transaction => filter(transaction));
+                if (transaction) {
+                    this.subscriber.subscription("newBlockHeaders").off("data", callback);
+                    var receipt = await this.web3.eth.getTransactionReceipt(transaction.hash);
+                    resolve(receipt);
+                }
+            }
+            this.subscriber.listen({ type: "newBlockHeaders" }, callback)
+        });
+    }
+
+    public async swap({ amountIn, amountOutMin }: { amountIn: Decimal, amountOutMin: Decimal }, path: string[], to: string, deadline: number, options: any = {}) {
+
+        var from = this.account.address;
+
+        if (this.web3.utils.toBN(from).isZero()) throw new Error("No Account Added");
+
+        var tokenIn = path[0];
+        var tokenOut = path[path.length - 1];
+
+        if (!this.getToken(tokenIn).address || !this.getToken(tokenOut).address) throw new Error("Tokens in path not added");
+
+        var amountInWithDecimals = amountIn.times(10 ** this.getToken(tokenIn).decimals);
+        var amountOutMinWithDecimals = amountOutMin.times(10 ** this.getToken(tokenOut).decimals);
+
+        if (amountInWithDecimals.equals(0) || amountInWithDecimals.greaterThan(this.getToken(tokenIn).balance)) throw new Error("Insufficient balance for this trade");
+
+        this.router.contract.options.from = from;
+
+        var data = this.router.contract.methods.swapExactTokensForTokens(amountInWithDecimals.toString(), amountOutMinWithDecimals.toString(), path, to, deadline).encodeABI();
+
+        var nonce = this.account.nonce;
+
+        options.gas = options.gas || 300000;
+        options.gasPrice = options.gasPrice || 1000000000;
+
+        this.web3.eth.sendTransaction({
+            from,
+            data,
+            nonce,
+            to: this.router.contract.options.address,
+            ...options
+        }).catch((e) => {
+            this.logger.log("ERROR", "The following error has occurred while sending the transaction : ");
+            console.log(e.message)
+        })
+
+        this.account.nonce += 1;
+
+        this.logger.log("INFO", `Swap ${amountIn} ${this.getToken(tokenIn).symbol} for a minimum of ${amountOutMin} ${this.getToken(tokenOut).symbol} ...`);
+
+        var transaction: any = await this.waitForTransaction((transaction: any) => transaction.from == from && String(transaction.nonce) == String(nonce));
+
+        var { status, transactionHash } = transaction;
+
+        this.logger.log("UPDATE", `${status ? "Swap executed successfully" : "Swap failed"} ( ${transactionHash} )`);
+
+        return transaction;
     }
 
 }
