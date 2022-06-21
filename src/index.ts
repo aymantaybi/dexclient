@@ -58,7 +58,7 @@ export default class DexClient {
             var pairAddress = this.web3.utils.toChecksumAddress(log.address);
             if (!this.pairs[pairAddress]) return;
             var reserves = this.web3.eth.abi.decodeParameters(['uint112', 'uint112'], log.data);
-            this.pairs[pairAddress].reserves = [reserves["0"], reserves["1"]];
+            this.pairs[pairAddress].reserves = [new Decimal(reserves["0"]), new Decimal(reserves["1"])];
             var { symbol } = this.pairs[pairAddress];
             //this.logger.log("UPDATE", `Pair : ${symbol} | Reserves : [ ${reserves["0"]}, ${reserves["1"]} ]`);
         });
