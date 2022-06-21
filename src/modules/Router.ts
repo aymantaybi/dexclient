@@ -50,7 +50,7 @@ export default class Router {
         if (!pair) throw new Error(`No reserves found for tokens : ${[tokenA, tokenB]} `);
         var reserves: Decimal[] = pair.reserves;
         reserves = tokenA == pair.tokens[0] ? [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
-        return reserves;
+        return reserves.map(reserve => new Decimal(reserve))
     }
 
     public getAmountsOut(amountIn: Decimal, path: string[]) {
