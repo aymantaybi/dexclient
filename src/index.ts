@@ -198,7 +198,7 @@ export default class DexClient {
             ...options
         }).catch((e) => {
             this.logger.log("ERROR", "The following error has occurred while sending the transaction : ");
-            //console.log(e.message)
+            console.log(e.message)
         });
 
         this.account.nonce += 1;
