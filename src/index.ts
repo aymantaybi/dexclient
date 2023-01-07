@@ -9,7 +9,7 @@ import Erc20 from "./modules/Erc20";
 import Pair from "./modules/Pair";
 
 import Subscriber from "./utils/Subscriber";
-import Logger from "./utils/Logger";
+import logger from "./utils/logger";
 
 import Account from "./Account";
 
@@ -27,9 +27,9 @@ export default class DexClient {
   tokens: { [key: string]: Erc20 };
   pairs: { [key: string]: Pair };
   subscriber: Subscriber;
-  logger: Logger;
   account: Account;
   websocketProvider: WebsocketProvider | undefined;
+  logger = logger;
 
   constructor({
     host,
@@ -59,7 +59,6 @@ export default class DexClient {
     });
     this.factory = new Factory({ web3: this.web3, address: factoryAddress });
     this.subscriber = new Subscriber(this.web3);
-    this.logger = new Logger();
     this.account = new Account({ web3: this.web3 });
 
     this.subscriber.listen(
@@ -82,7 +81,7 @@ export default class DexClient {
           tokenAddress
         ].balanceOf(walletAddress);
         var { symbol, balance, decimals } = this.tokens[tokenAddress];
-        this.logger.log(
+        this.logger.info(
           "UPDATE",
           `Symbol : ${symbol} | Balance : ${new Decimal(balance).dividedBy(
             10 ** decimals
@@ -104,8 +103,6 @@ export default class DexClient {
           new Decimal(reserves["0"]),
           new Decimal(reserves["1"]),
         ];
-        var { symbol } = this.pairs[pairAddress];
-        //this.logger.log("UPDATE", `Pair : ${symbol} | Reserves : [ ${reserves["0"]}, ${reserves["1"]} ]`);
       }
     );
 
@@ -121,11 +118,11 @@ export default class DexClient {
       this.account.nonce = Math.max(this.account.nonce, nonce);
       this.account.balance = await this.account.getBalance(address);
       var { nonce, balance } = this.account;
-      this.logger.log(
+      this.logger.info(
         "UPDATE",
         `Account Balance : ${this.web3.utils.fromWei(balance)}`
       );
-      this.logger.log("UPDATE", `Transactions count : ${nonce}`);
+      this.logger.info("UPDATE", `Transactions count : ${nonce}`);
     });
   }
 
@@ -138,7 +135,7 @@ export default class DexClient {
     });
     var token = await this.tokens[tokenAddress].load();
     var { symbol } = token;
-    this.logger.log("INFO", `Token Added : ${symbol}`);
+    this.logger.info("INFO", `Token Added : ${symbol}`);
     return this.getToken(tokenAddress);
   }
 
@@ -165,7 +162,7 @@ export default class DexClient {
         : address
     );
     if (this.web3.utils.toBN(pairAddress).isZero())
-      return this.logger.log(
+      return this.logger.info(
         "ERROR",
         `No Pair found for this tokens ${address}`
       );
@@ -176,12 +173,12 @@ export default class DexClient {
     var pair = await this.pairs[pairAddress].load();
     if (!pair) {
       delete this.pairs[pairAddress];
-      this.logger.log("ERROR", `${address} is not a Pair Contract`);
+      this.logger.info("ERROR", `${address} is not a Pair Contract`);
       return;
     }
     var { symbol, tokens } = pair;
     await Promise.all(tokens.map((token) => this.addToken(token)));
-    this.logger.log("INFO", `Pair Added : ${symbol}`);
+    this.logger.info("INFO", `Pair Added : ${symbol}`);
     return this.getPair(pairAddress);
   }
 
@@ -192,7 +189,7 @@ export default class DexClient {
 
   public async addAccount(privateKey: string) {
     var { address, balance, nonce } = await this.account.load(privateKey);
-    this.logger.log(
+    this.logger.info(
       "INFO",
       `Account balance : ${this.web3.utils.fromWei(balance)}`
     );
@@ -297,7 +294,7 @@ export default class DexClient {
         ...options,
       })
       .catch((e) => {
-        this.logger.log(
+        this.logger.info(
           "ERROR",
           "The following error has occurred while sending the transaction : "
         );
@@ -306,7 +303,7 @@ export default class DexClient {
 
     this.account.nonce += 1;
 
-    this.logger.log("INFO", message);
+    this.logger.info("INFO", message);
 
     var transaction: any = await this.waitForTransaction(
       (transaction: any) =>
@@ -315,7 +312,7 @@ export default class DexClient {
 
     var { status, transactionHash } = transaction;
 
-    this.logger.log(
+    this.logger.info(
       "UPDATE",
       `${
         status ? "Swap executed successfully" : "Swap failed"

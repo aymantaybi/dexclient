@@ -1,16 +1,16 @@
 const websocketProviderOptions = {
   timeout: 10000,
   clientConfig: {
-    maxReceivedFrameSize: 100000000000,
-    maxReceivedMessageSize: 100000000000,
+    maxReceivedFrameSize: 100000000,
+    maxReceivedMessageSize: 100000000,
     keepalive: true,
     keepaliveInterval: 10000,
   },
   reconnect: {
     auto: true,
-    delay: 10,
-    maxAttempts: 10,
-    onTimeout: false,
+    delay: 100,
+    maxAttempts: Infinity,
+    onTimeout: true,
   },
 };
 
