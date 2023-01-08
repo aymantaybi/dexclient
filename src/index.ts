@@ -31,20 +31,10 @@ export default class DexClient {
   websocketProvider: WebsocketProvider | undefined;
   logger = logger;
 
-  constructor({
-    host,
-    websocketProvider,
-    routerAddress,
-    factoryAddress,
-  }: DexClientConstructor) {
-    if (!host && !websocketProvider)
-      throw new Error(
-        "You need to provide either 'host' or 'websocketProvider' to the constructor "
-      );
+  constructor({ host, websocketProvider, routerAddress, factoryAddress }: DexClientConstructor) {
+    if (!host && !websocketProvider) throw new Error("You need to provide either 'host' or 'websocketProvider' to the constructor ");
 
-    this.websocketProvider = host
-      ? new WebsocketProvider(host, websocketProviderOptions)
-      : websocketProvider;
+    this.websocketProvider = host ? new WebsocketProvider(host, websocketProviderOptions) : websocketProvider;
 
     this.web3 = new Web3(this.websocketProvider!);
 
@@ -61,68 +51,35 @@ export default class DexClient {
     this.subscriber = new Subscriber(this.web3);
     this.account = new Account({ web3: this.web3 });
 
-    this.subscriber.listen(
-      { type: "logs", functionName: "Transfer(address,address,uint256)" },
-      async (log) => {
-        var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
-        if (
-          !walletAddress ||
-          !log.topics.includes(
-            this.web3.utils.padLeft(
-              walletAddress.toLowerCase(),
-              log.topics[0].length - 2
-            )
-          )
-        )
-          return;
-        var tokenAddress = this.web3.utils.toChecksumAddress(log.address);
-        if (!this.tokens[tokenAddress]) return;
-        this.tokens[tokenAddress].balance = await this.tokens[
-          tokenAddress
-        ].balanceOf(walletAddress);
-        var { symbol, balance, decimals } = this.tokens[tokenAddress];
-        this.logger.info(
-          "UPDATE",
-          `Symbol : ${symbol} | Balance : ${new Decimal(balance).dividedBy(
-            10 ** decimals
-          )}`
-        );
-      }
-    );
+    this.subscriber.listen({ type: "logs", functionName: "Transfer(address,address,uint256)" }, async (log) => {
+      var walletAddress = this.web3.eth.accounts.wallet[0]?.address;
+      if (!walletAddress || !log.topics.includes(this.web3.utils.padLeft(walletAddress.toLowerCase(), log.topics[0].length - 2))) return;
+      var tokenAddress = this.web3.utils.toChecksumAddress(log.address);
+      if (!this.tokens[tokenAddress]) return;
+      this.tokens[tokenAddress].balance = await this.tokens[tokenAddress].balanceOf(walletAddress);
+      var { symbol, balance, decimals } = this.tokens[tokenAddress];
+      this.logger.info(`Symbol : ${symbol} | Balance : ${new Decimal(balance).dividedBy(10 ** decimals)}`);
+    });
 
-    this.subscriber.listen(
-      { type: "logs", functionName: "Sync(uint112,uint112)" },
-      async (log) => {
-        var pairAddress = this.web3.utils.toChecksumAddress(log.address);
-        if (!this.pairs[pairAddress]) return;
-        var reserves = this.web3.eth.abi.decodeParameters(
-          ["uint112", "uint112"],
-          log.data
-        );
-        this.pairs[pairAddress].reserves = [
-          new Decimal(reserves["0"]),
-          new Decimal(reserves["1"]),
-        ];
-      }
-    );
+    this.subscriber.listen({ type: "logs", functionName: "Sync(uint112,uint112)" }, async (log) => {
+      var pairAddress = this.web3.utils.toChecksumAddress(log.address);
+      if (!this.pairs[pairAddress]) return;
+      var reserves = this.web3.eth.abi.decodeParameters(["uint112", "uint112"], log.data);
+      this.pairs[pairAddress].reserves = [new Decimal(reserves["0"]), new Decimal(reserves["1"])];
+    });
 
     this.subscriber.listen({ type: "newBlockHeaders" }, async (blockHeader) => {
       var { address } = this.account;
       if (this.web3.utils.toBN(address).isZero()) return;
       var block = await this.web3.eth.getBlock(blockHeader.number, true);
-      var filtredTransactions = block.transactions.filter(
-        (transaction) => transaction.from == address
-      );
+      var filtredTransactions = block.transactions.filter((transaction) => transaction.from == address);
       if (!filtredTransactions.length) return;
       var { nonce } = filtredTransactions.sort((a, b) => b.nonce - a.nonce)[0];
       this.account.nonce = Math.max(this.account.nonce, nonce);
       this.account.balance = await this.account.getBalance(address);
       var { nonce, balance } = this.account;
-      this.logger.info(
-        "UPDATE",
-        `Account Balance : ${this.web3.utils.fromWei(balance)}`
-      );
-      this.logger.info("UPDATE", `Transactions count : ${nonce}`);
+      this.logger.info(`Account Balance : ${this.web3.utils.fromWei(balance)}`);
+      this.logger.info(`Transactions count : ${nonce}`);
     });
   }
 
@@ -135,7 +92,7 @@ export default class DexClient {
     });
     var token = await this.tokens[tokenAddress].load();
     var { symbol } = token;
-    this.logger.info("INFO", `Token Added : ${symbol}`);
+    this.logger.info(`Token Added : ${symbol}`);
     return this.getToken(tokenAddress);
   }
 
@@ -156,16 +113,8 @@ export default class DexClient {
   }
 
   public async addPair(address: string | string[]) {
-    var pairAddress = this.web3.utils.toChecksumAddress(
-      Array.isArray(address)
-        ? await this.factory.getPair(address[0], address[1])
-        : address
-    );
-    if (this.web3.utils.toBN(pairAddress).isZero())
-      return this.logger.info(
-        "ERROR",
-        `No Pair found for this tokens ${address}`
-      );
+    var pairAddress = this.web3.utils.toChecksumAddress(Array.isArray(address) ? await this.factory.getPair(address[0], address[1]) : address);
+    if (this.web3.utils.toBN(pairAddress).isZero()) return this.logger.error(`No Pair found for this tokens ${address}`);
     this.pairs[pairAddress] = new Pair({
       web3: this.web3,
       address: pairAddress,
@@ -173,12 +122,12 @@ export default class DexClient {
     var pair = await this.pairs[pairAddress].load();
     if (!pair) {
       delete this.pairs[pairAddress];
-      this.logger.info("ERROR", `${address} is not a Pair Contract`);
+      this.logger.error(`${address} is not a Pair Contract`);
       return;
     }
     var { symbol, tokens } = pair;
     await Promise.all(tokens.map((token) => this.addToken(token)));
-    this.logger.info("INFO", `Pair Added : ${symbol}`);
+    this.logger.info(`Pair Added : ${symbol}`);
     return this.getPair(pairAddress);
   }
 
@@ -189,17 +138,12 @@ export default class DexClient {
 
   public async addAccount(privateKey: string) {
     var { address, balance, nonce } = await this.account.load(privateKey);
-    this.logger.info(
-      "INFO",
-      `Account balance : ${this.web3.utils.fromWei(balance)}`
-    );
+    this.logger.info(`Account balance : ${this.web3.utils.fromWei(balance)}`);
     return this.account;
   }
 
   public getPath(tokenIn: string, tokenOut: string) {
-    var pair = Object.values(this.pairs).find(
-      (pair) => pair.tokens.includes(tokenIn) && pair.tokens.includes(tokenOut)
-    );
+    var pair = Object.values(this.pairs).find((pair) => pair.tokens.includes(tokenIn) && pair.tokens.includes(tokenOut));
     if (pair) return [tokenIn, tokenOut];
   }
 
@@ -207,14 +151,10 @@ export default class DexClient {
     return new Promise((resolve, reject) => {
       var callback = async (blockHeader: any) => {
         var block = await this.web3.eth.getBlock(blockHeader.number, true);
-        var transaction = block.transactions.find((transaction) =>
-          filter(transaction)
-        );
+        var transaction = block.transactions.find((transaction) => filter(transaction));
         if (transaction) {
           this.subscriber.subscription("newBlockHeaders").off("data", callback);
-          var receipt = await this.web3.eth.getTransactionReceipt(
-            transaction.hash
-          );
+          var receipt = await this.web3.eth.getTransactionReceipt(transaction.hash);
           resolve(receipt);
         }
       };
@@ -223,12 +163,7 @@ export default class DexClient {
   }
 
   public async swap(
-    {
-      amountIn = null,
-      amountOutMin = null,
-      amountOut = null,
-      amountInMax = null,
-    }: any,
+    { amountIn = null, amountOutMin = null, amountOut = null, amountInMax = null }: any,
     path: string[],
     to: string,
     deadline: number,
@@ -236,20 +171,14 @@ export default class DexClient {
   ) {
     var from = this.account.address;
 
-    if (this.web3.utils.toBN(from).isZero())
-      throw new Error("No Account Added");
+    if (this.web3.utils.toBN(from).isZero()) throw new Error("No Account Added");
 
     var tokenIn = this.getToken(path[0]);
     var tokenOut = this.getToken(path[path.length - 1]);
 
-    if (!tokenIn.address || !tokenOut.address)
-      throw new Error("Tokens in path not added");
+    if (!tokenIn.address || !tokenOut.address) throw new Error("Tokens in path not added");
 
-    if (
-      tokenIn.balance.lessThan(amountIn || 0) ||
-      tokenIn.balance.lessThan(amountInMax || 0)
-    )
-      throw new Error("Insufficient balance for this trade");
+    if (tokenIn.balance.lessThan(amountIn || 0) || tokenIn.balance.lessThan(amountInMax || 0)) throw new Error("Insufficient balance for this trade");
 
     this.router.contract.options.from = from;
 
@@ -260,9 +189,7 @@ export default class DexClient {
     if (amountIn && amountOutMin) {
       method = "swapExactTokensForTokens";
       var amountInWithDecimals = amountIn.times(10 ** tokenIn.decimals);
-      var amountOutMinWithDecimals = amountOutMin.times(
-        10 ** tokenOut.decimals
-      );
+      var amountOutMinWithDecimals = amountOutMin.times(10 ** tokenOut.decimals);
       inputs = [amountInWithDecimals, amountOutMinWithDecimals];
       message = `Swap ${amountIn} ${tokenIn.symbol} for a minimum of ${amountOutMin} ${tokenOut.symbol} ...`;
     } else if (amountOut && amountInMax) {
@@ -273,12 +200,7 @@ export default class DexClient {
       message = `Swap a maximum of ${amountInMax} ${tokenIn.symbol} for ${amountOut} ${tokenOut.symbol} ...`;
     }
 
-    var data = this.router.contract.methods[method](
-      ...inputs.map((amount) => amount.toString()),
-      path,
-      to,
-      deadline
-    ).encodeABI();
+    var data = this.router.contract.methods[method](...inputs.map((amount) => amount.toString()), path, to, deadline).encodeABI();
 
     var nonce = this.account.nonce;
 
@@ -294,30 +216,21 @@ export default class DexClient {
         ...options,
       })
       .catch((e) => {
-        this.logger.info(
-          "ERROR",
-          "The following error has occurred while sending the transaction : "
-        );
+        this.logger.error("The following error has occurred while sending the transaction : ");
         console.log(e.message);
       });
 
     this.account.nonce += 1;
 
-    this.logger.info("INFO", message);
+    this.logger.info(message);
 
     var transaction: any = await this.waitForTransaction(
-      (transaction: any) =>
-        transaction.from == from && String(transaction.nonce) == String(nonce)
+      (transaction: any) => transaction.from == from && String(transaction.nonce) == String(nonce)
     );
 
     var { status, transactionHash } = transaction;
 
-    this.logger.info(
-      "UPDATE",
-      `${
-        status ? "Swap executed successfully" : "Swap failed"
-      } ( ${transactionHash} )`
-    );
+    this.logger.info(`${status ? "Swap executed successfully" : "Swap failed"} ( ${transactionHash} )`);
 
     return transaction;
   }
