@@ -29,29 +29,29 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     const currentTimestamp = Date.now();
     logger.info(`Current block ${data.number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`);
   });
-  
+
   const account = await client.addAccount(PRIVATE_KEY);
 
   account.on("balanceUpdate", (data) => {
-    console.log(`Account ${data.account} Balance update: ${data.balance}`);
+    logger.info(`Account ${data.account} Balance update: ${data.balance}`);
   });
 
   account.on("nonceUpdate", (data) => {
-    console.log(`Account ${data.account} Nonce update: ${data.nonce}`);
+    logger.info(`Account ${data.account} Nonce update: ${data.nonce}`);
   });
 
-  console.log(`Account Balance: ${account.balance()}`);
-  console.log(`Account Nonce: ${account.nonce}`);
+  logger.info(`Account Balance: ${account.balance()}`);
+  logger.info(`Account Nonce: ${account.nonce}`);
 
   const SLPToken = await client.addToken(SLPAddress);
   const WETHToken = await client.addToken(WETHAddress);
 
   SLPToken.fetcher.on("balanceUpdate", () => {
-    console.log(`SLP Balance: ${SLPToken.balance()}`);
+    logger.info(`SLP Balance: ${SLPToken.balance()}`);
   });
 
   WETHToken.fetcher.on("balanceUpdate", () => {
-    console.log(`WETH Balance: ${WETHToken.balance()}`);
+    logger.info(`WETH Balance: ${WETHToken.balance()}`);
   });
 
   const SLPWETHAddress = "0x306A28279d04a47468ed83d55088d0DCd1369294";
@@ -59,7 +59,7 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
   const SLPWETHPair = await client.addPair(SLPWETHAddress);
 
   SLPWETHPair.fetcher.on("reservesUpdate", () => {
-    console.log(SLPWETHPair.reserves());
+    logger.info(SLPWETHPair.reserves());
   });
 
   setTimeout(async () => {
@@ -67,24 +67,29 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     const gas = 300000;
     const gasPrice = 20000000000;
     const swap = client.swap({ amountOut: new Decimal(1) }, [WETHToken, SLPToken]);
+
     const transaction = swap.execute(SwapType.EXACT_INPUT, { nonce, gas, gasPrice });
-    console.log("Transaction sent");
-    transaction.once("error", (error) => {
-      console.log("Original transaction");
-      console.log(error.message);
+
+    logger.info("Original transaction sent");
+
+    transaction.once("transactionHash", (transactionHash) => {
+      logger.info(`Original transaction transactionHash ${transactionHash}`);
     });
 
     setTimeout(async () => {
-      console.log("Replacement transaction");
       swap.amounts({ amountOut: new Decimal(2) });
+
       const transaction = swap.execute(SwapType.EXACT_INPUT, {
         nonce,
         gas,
         gasPrice: 40000000000,
       });
-      console.log(swap.transactionConfig);
-    }, 500);
 
-    console.log(swap.transactionConfig);
-  }, 10000); 
+      logger.info("Replacement transaction sent");
+
+      transaction.once("transactionHash", (transactionHash) => {
+        logger.info(`Replacement transaction transactionHash ${transactionHash}`);
+      });
+    }, 500);
+  }, 10000);
 })();
