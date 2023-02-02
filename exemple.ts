@@ -29,7 +29,7 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     const currentTimestamp = Date.now();
     logger.info(`Current block ${data.number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`);
   });
-  /* 
+  
   const account = await client.addAccount(PRIVATE_KEY);
 
   account.on("balanceUpdate", (data) => {
@@ -86,5 +86,5 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     }, 500);
 
     console.log(swap.transactionConfig);
-  }, 10000); */
+  }, 10000); 
 })();
