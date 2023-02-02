@@ -1,6 +1,5 @@
 import { WalletBase } from "web3-core";
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
-import { BlockTransactionObject } from "web3-eth";
 import { fromWei } from "web3-utils";
 import EventEmitter from "events";
 
