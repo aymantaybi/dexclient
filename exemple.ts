@@ -68,6 +68,12 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     const gasPrice = 20000000000;
     const swap = client.swap({ amountOut: new Decimal(1) }, [WETHToken, SLPToken]);
 
+    const nextBlockTime = getNextBlockTime(client.blocks);
+    const currentTimestamp = Date.now();
+    logger.info(
+      `Current block ${client.blocks[0].number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`
+    );
+
     const transaction = swap.execute(SwapType.EXACT_INPUT, { nonce, gas, gasPrice });
 
     logger.info("Original transaction sent");
@@ -78,6 +84,12 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
 
     setTimeout(async () => {
       swap.amounts({ amountOut: new Decimal(2) });
+
+      const nextBlockTime = getNextBlockTime(client.blocks);
+      const currentTimestamp = Date.now();
+      logger.info(
+        `Current block ${client.blocks[0].number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`
+      );
 
       const transaction = swap.execute(SwapType.EXACT_INPUT, {
         nonce,
