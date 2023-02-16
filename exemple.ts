@@ -1,6 +1,6 @@
-import Decimal from "decimal.js";
 import * as dotenv from "dotenv";
 dotenv.config();
+import Decimal from "decimal.js";
 import Web3 from "web3";
 import { Client } from "./src";
 import { SwapType } from "./src/entities/swap";
@@ -24,10 +24,10 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
 
   await client.initialize();
 
-  client.fetcher.on("newBlock", (data) => {
-    const nextBlockTime = getNextBlockTime(client.blocks);
+  client.fetcher.subscription?.on("data", (data) => {
+    const nextBlockTime = getNextBlockTime(client.blocksHeaders);
     const currentTimestamp = Date.now();
-    logger.info(`Current block ${data.number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`);
+    logger.info(`New block ${data.number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`);
   });
 
   const account = await client.addAccount(PRIVATE_KEY);
@@ -66,42 +66,10 @@ if (!PRIVATE_KEY) throw Error("Missing PRIVATE_KEY from .env file ");
     const { nonce } = client.account;
     const gas = 300000;
     const gasPrice = 20000000000;
-    const swap = client.swap({ amountOut: new Decimal(1) }, [WETHToken, SLPToken]);
-
-    const nextBlockTime = getNextBlockTime(client.blocks);
+    const swap = client.swap([WETHToken, SLPToken], { amountOut: new Decimal(1) });
+    const { number, timestamp } = getNextBlockTime(client.blocksHeaders);
     const currentTimestamp = Date.now();
-    logger.info(
-      `Current block ${client.blocks[0].number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`
-    );
-
+    logger.info(`Current block ${client.blocksHeaders[0].number}, next block (${number}) in ${timestamp * 1000 - currentTimestamp} ms`);
     const transaction = swap.execute(SwapType.EXACT_INPUT, { nonce, gas, gasPrice });
-
-    logger.info("Original transaction sent");
-
-    transaction.once("transactionHash", (transactionHash) => {
-      logger.info(`Original transaction transactionHash ${transactionHash}`);
-    });
-
-    setTimeout(async () => {
-      swap.amounts({ amountOut: new Decimal(2) });
-
-      const nextBlockTime = getNextBlockTime(client.blocks);
-      const currentTimestamp = Date.now();
-      logger.info(
-        `Current block ${client.blocks[0].number}, next block (${nextBlockTime.number}) in ${nextBlockTime.timestamp * 1000 - currentTimestamp} ms`
-      );
-
-      const transaction = swap.execute(SwapType.EXACT_INPUT, {
-        nonce,
-        gas,
-        gasPrice: 40000000000,
-      });
-
-      logger.info("Replacement transaction sent");
-
-      transaction.once("transactionHash", (transactionHash) => {
-        logger.info(`Replacement transaction transactionHash ${transactionHash}`);
-      });
-    }, 500);
   }, 10000);
 })();
