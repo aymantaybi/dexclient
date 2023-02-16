@@ -1,15 +1,13 @@
+import { Fetcher } from "@aymantaybi/dexclient-fetcher";
 import Decimal from "decimal.js";
+import { PromiEvent, TransactionConfig, TransactionReceipt } from "web3-core";
+import ABICoder from "web3-eth-abi";
+import { AbiItem } from "web3-utils";
+import { swapExactTokensForTokens, swapTokensForExactTokens } from "../constants";
+import { formatAmount, isSwapAmountIn } from "../helpers";
 import { SwapAmount } from "../interfaces";
 import { Pair } from "./pair";
 import { Token } from "./token";
-import { isSwapAmountIn } from "../helpers/customTypeGuards";
-import { Fetcher } from "@aymantaybi/dexclient-fetcher";
-import { swapExactTokensForTokens, swapTokensForExactTokens } from "../constants";
-import { AbiItem } from "web3-utils";
-import { formatAmount } from "../helpers";
-import Account from "./account";
-import ABICoder from "web3-eth-abi";
-import { TransactionConfig } from "web3-core";
 
 export enum SwapType {
   EXACT_INPUT,
@@ -18,53 +16,57 @@ export enum SwapType {
 
 export class Swap {
   fetcher: Fetcher;
-  account: Account;
   router: string;
   path: Token[];
   pairs: (Pair | undefined)[];
   amountIn: Decimal | undefined;
   amountOut: Decimal | undefined;
   transactionConfig: TransactionConfig | undefined;
+  transactionHash: string | undefined;
+  transactionReceipt: TransactionReceipt | undefined;
 
-  constructor({
-    fetcher,
-    account,
-    router,
-    path,
-    pairs,
-  }: {
-    fetcher: Fetcher;
-    account: Account;
-    router: string;
-    path: Token[];
-    pairs: (Pair | undefined)[];
-  }) {
+  constructor({ fetcher, router, path, pairs }: { fetcher: Fetcher; router: string; path: Token[]; pairs: (Pair | undefined)[] }) {
     this.fetcher = fetcher;
-    this.account = account;
     this.router = router;
     this.path = path;
     this.pairs = pairs;
-    this.fetcher.web3.eth.transactionBlockTimeout = 5
-    this.fetcher.web3.eth.transactionConfirmationBlocks = 5;
+  }
+
+  private addTransactionEventsListeners(transaction: PromiEvent<TransactionReceipt>) {
+    transaction.once("transactionHash", (transactionHash) => {
+      this.transactionHash = transactionHash;
+    });
+    transaction.once("receipt", (transactionReceipt) => {
+      this.transactionReceipt = transactionReceipt;
+    });
+    transaction.once("error", (error: any) => {
+      if ("receipt" in error) {
+        this.transactionReceipt = error.receipt as TransactionReceipt;
+      }
+    });
   }
 
   execute(type: SwapType, transactionConfig: TransactionConfig) {
     const parameters = this.parameters(type);
+    const from = parameters[3];
     const abiItem = type === SwapType.EXACT_INPUT ? swapExactTokensForTokens : swapTokensForExactTokens;
     const encodedFunctionCall = ABICoder.encodeFunctionCall(abiItem as AbiItem, parameters as any);
-    const from = this.account.address();
     const to = this.router;
     const data = encodedFunctionCall;
     this.transactionConfig = { ...transactionConfig, from, to, data };
     const transaction = this.fetcher.web3.eth.sendTransaction({ ...this.transactionConfig });
+    this.addTransactionEventsListeners(transaction);
     return transaction;
   }
 
   parameters(type: SwapType) {
     const path = this.path;
-    const to = this.account.address();
+    const to = this.fetcher.web3.eth.accounts.wallet[0]?.address;
+    if (!to) {
+      throw Error("Invalid 'to' parameter");
+    }
     const deadline = Math.round(Date.now() / 1000) + 600;
-    const parameters = ["0", "0", path.map((token) => token.address), to, deadline];
+    const parameters: [string, string, string[], string, number] = ["0", "0", path.map((token) => token.address), to, deadline];
     const { amountIn, amountOut } = this;
     const { decimals: tokenInDecimals } = this.path[0];
     const { decimals: tokenOutDecimals } = this.path[this.path.length - 1];
