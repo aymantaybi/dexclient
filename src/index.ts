@@ -1,7 +1,7 @@
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
 import { WebsocketProvider } from "web3-providers-ws";
 import { toChecksumAddress } from "web3-utils";
-import { BlockTransactionObject } from "web3-eth";
+import { BlockHeader } from "web3-eth";
 import { Token } from "./entities/token";
 import { Account } from "./entities/account";
 import { Pair } from "./entities/pair";
@@ -17,7 +17,7 @@ export class Client {
   account: Account;
   tokens: Token[] = [];
   pairs: Pair[] = [];
-  blocks: BlockTransactionObject[] = [];
+  blocksHeaders: BlockHeader[] = [];
 
   constructor({ websocketProvider, router }: { websocketProvider: WebsocketProvider; router: string }) {
     this.websocketProvider = websocketProvider;
@@ -29,9 +29,10 @@ export class Client {
   async initialize() {
     const batch = new this.fetcher.web3.BatchRequest();
     await this.fetcher.initialize();
-    this.fetcher.on("newBlock", (block) => {
-      if (this.blocks.find((localBlock) => localBlock.number === block.number)) return;
-      this.blocks.unshift(block);
+    this.fetcher.subscription?.on("data", (blockHeader) => {
+      if (this.blocksHeaders.find((localBlockHeader) => localBlockHeader.number === blockHeader.number)) return;
+      this.blocksHeaders.unshift(blockHeader);
+      this.blocksHeaders.pop();
     });
     const currentBlock = await this.fetcher.web3.eth.getBlock("latest", true);
     const { number: currentBlockNumber } = currentBlock;
@@ -39,7 +40,7 @@ export class Client {
       batch.add((this.fetcher.web3.eth.getBlock as any).request(blockNumber, true));
     }
     const blocks = await executeAsync(batch);
-    this.blocks = blocks;
+    this.blocksHeaders = blocks;
   }
 
   async addAccount(privateKey: string) {
@@ -96,10 +97,10 @@ export class Client {
     return pairs;
   }
 
-  swap(amount: SwapAmount, path: Token[]) {
-    const { fetcher, router, account } = this;
+  swap(path: Token[], amount: SwapAmount) {
+    const { fetcher, router } = this;
     const pairs = this.getPairs(path);
-    const swap = new Swap({ router, account, fetcher, path, pairs });
+    const swap = new Swap({ router, fetcher, path, pairs });
     swap.amounts(amount);
     return swap;
   }
