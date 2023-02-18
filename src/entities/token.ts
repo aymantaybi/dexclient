@@ -7,6 +7,7 @@ export class Token {
   account: Account;
   address: string;
   decimals: string;
+  symbol: string;
   private rawBalance: string = "0";
 
   constructor({ fetcher, account }: { fetcher: Erc20Fetcher; account: Account }) {
@@ -14,6 +15,7 @@ export class Token {
     this.account = account;
     this.address = fetcher.address;
     this.decimals = fetcher.decimals;
+    this.symbol = fetcher.symbol;
     this.fetcher.on("balanceUpdate", (data) => {
       this.rawBalance = data.balance;
     });
