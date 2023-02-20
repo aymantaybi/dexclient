@@ -8,7 +8,6 @@ import { Pair } from "./entities/pair";
 import { GetPairArgument, SwapAmount } from "./interfaces";
 import { isGetPairArgumentPairAddress } from "./helpers/customTypeGuards";
 import { Swap } from "./entities/swap";
-import { executeAsync } from "@aymantaybi/dexclient-fetcher/dist/helpers";
 
 export class Client {
   websocketProvider: WebsocketProvider;
@@ -27,19 +26,15 @@ export class Client {
   }
 
   async initialize() {
-    const batch = new this.fetcher.web3.BatchRequest();
     await this.fetcher.initialize();
     this.fetcher.subscription?.on("data", (blockHeader) => {
       if (this.blocksHeaders.find((localBlockHeader) => localBlockHeader.number === blockHeader.number)) return;
       this.blocksHeaders.unshift(blockHeader);
       this.blocksHeaders.pop();
     });
-    const currentBlock = await this.fetcher.web3.eth.getBlock("latest", true);
-    const { number: currentBlockNumber } = currentBlock;
-    for (let blockNumber = currentBlockNumber; blockNumber > currentBlockNumber - 10; blockNumber--) {
-      batch.add((this.fetcher.web3.eth.getBlock as any).request(blockNumber, true));
-    }
-    const blocks = await executeAsync(batch);
+    const currentBlock = await this.fetcher.web3.eth.getBlock("latest");
+    const previousBlock = await this.fetcher.web3.eth.getBlock(currentBlock.number - 1);
+    const blocks = [currentBlock, previousBlock];
     this.blocksHeaders = blocks;
   }
 

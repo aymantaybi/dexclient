@@ -17,8 +17,7 @@ export function getAverageBlockTime(blocksHeaders: BlockHeader[]) {
     const duration = Number(nextBlock.timestamp) - Number(block.timestamp);
     durations.push(duration);
   });
-  const sum = durations.reduce((a, b) => a + b, 0);
-  return sum / durations.length || 0;
+  return durations.reduce((a, b) => a + b, 0) / durations.length;
 }
 
 export function getNextBlockTime(blocksHeaders: BlockHeader[]) {
