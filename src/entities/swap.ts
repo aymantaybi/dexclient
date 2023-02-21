@@ -40,7 +40,7 @@ export class Swap {
       this.transactionReceipt = transactionReceipt;
     });
     transaction.once("error", (error: any) => {
-      if ("receipt" in error) {
+      if (error.receipt) {
         this.transactionReceipt = error.receipt as TransactionReceipt;
       }
     });
