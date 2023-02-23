@@ -8,6 +8,7 @@ import { Pair } from "./entities/pair";
 import { GetPairArgument, SwapAmount } from "./interfaces";
 import { isGetPairArgumentPairAddress } from "./helpers/customTypeGuards";
 import { Swap } from "./entities/swap";
+import { Route } from "./entities/route";
 
 export class Client {
   websocketProvider: WebsocketProvider;
@@ -95,8 +96,8 @@ export class Client {
   swap(path: Token[], amount: SwapAmount) {
     const { fetcher, router } = this;
     const pairs = this.getPairs(path);
-    const swap = new Swap({ router, fetcher, path, pairs });
-    swap.amounts(amount);
+    const route = new Route({ path, pairs });
+    const swap = new Swap({ router, fetcher, route }, amount);
     return swap;
   }
 }

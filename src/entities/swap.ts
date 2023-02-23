@@ -1,13 +1,11 @@
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
-import Decimal from "decimal.js";
 import { PromiEvent, TransactionConfig, TransactionReceipt } from "web3-core";
 import ABICoder from "web3-eth-abi";
 import { AbiItem } from "web3-utils";
 import { swapExactTokensForTokens, swapTokensForExactTokens } from "../constants";
-import { formatAmount, isSwapAmountIn } from "../helpers";
+import { formatAmount } from "../helpers";
 import { SwapAmount } from "../interfaces";
-import { Pair } from "./pair";
-import { Token } from "./token";
+import { Route } from "./route";
 
 export enum SwapType {
   EXACT_INPUT,
@@ -17,19 +15,16 @@ export enum SwapType {
 export class Swap {
   fetcher: Fetcher;
   router: string;
-  path: Token[];
-  pairs: (Pair | undefined)[];
-  amountIn: Decimal | undefined;
-  amountOut: Decimal | undefined;
+  route: Route;
   transactionConfig: TransactionConfig | undefined;
   transactionHash: string | undefined;
   transactionReceipt: TransactionReceipt | undefined;
 
-  constructor({ fetcher, router, path, pairs }: { fetcher: Fetcher; router: string; path: Token[]; pairs: (Pair | undefined)[] }) {
+  constructor({ fetcher, router, route }: { fetcher: Fetcher; router: string; route: Route }, amount: SwapAmount) {
     this.fetcher = fetcher;
     this.router = router;
-    this.path = path;
-    this.pairs = pairs;
+    this.route = route;
+    this.route.amounts(amount);
   }
 
   private addTransactionEventsListeners(transaction: PromiEvent<TransactionReceipt>) {
@@ -60,16 +55,15 @@ export class Swap {
   }
 
   parameters(type: SwapType) {
-    const path = this.path;
+    const { path, amountIn, amountOut } = this.route;
     const to = this.fetcher.web3.eth.accounts.wallet[0]?.address;
     if (!to) {
       throw Error("Invalid 'to' parameter");
     }
     const deadline = Math.round(Date.now() / 1000) + 600;
     const parameters: [string, string, string[], string, number] = ["0", "0", path.map((token) => token.address), to, deadline];
-    const { amountIn, amountOut } = this;
-    const { decimals: tokenInDecimals } = this.path[0];
-    const { decimals: tokenOutDecimals } = this.path[this.path.length - 1];
+    const { decimals: tokenInDecimals } = path[0];
+    const { decimals: tokenOutDecimals } = path[path.length - 1];
     if (type === SwapType.EXACT_INPUT) {
       const amountOutMin = amountOut;
       parameters[0] = formatAmount(amountIn || 0, tokenInDecimals).toString();
@@ -80,43 +74,5 @@ export class Swap {
       parameters[1] = formatAmount(amountInMax || 0, tokenInDecimals).toString();
     }
     return parameters;
-  }
-
-  amounts(amount: SwapAmount) {
-    if (isSwapAmountIn(amount)) {
-      const { amountIn } = amount;
-      [this.amountIn, this.amountOut] = this.getAmountsOut(amountIn);
-    } else {
-      const { amountOut } = amount;
-      [this.amountIn, this.amountOut] = this.getAmountsIn(amountOut);
-    }
-    return [this.amountIn, this.amountOut];
-  }
-
-  private getAmountsOut(amountIn: Decimal) {
-    const amounts = [amountIn];
-    for (let i = 0; i < this.path.length - 1; i++) {
-      const tokenIn = this.path[i];
-      const tokenOut = this.path[i + 1];
-      const pair = this.pairs[i];
-      if (!pair) throw Error(`Pair of tokens ${tokenIn.address},${tokenOut.address} is missing`);
-      amounts[i + 1] = pair.amountOut(tokenIn.address, amounts[i]);
-    }
-    const amountOut = amounts[amounts.length - 1];
-    return [amountIn, amountOut];
-  }
-
-  private getAmountsIn(amountOut: Decimal) {
-    const amounts = new Array(this.path.length);
-    amounts[this.path.length - 1] = amountOut;
-    for (let i = this.path.length - 1; i > 0; i--) {
-      const tokenIn = this.path[i - 1];
-      const tokenOut = this.path[i];
-      const pair = this.pairs[i - 1];
-      if (!pair) throw Error(`Pair of tokens ${tokenIn.address},${tokenOut.address} is missing`);
-      amounts[i - 1] = pair.amountIn(tokenOut.address, amounts[i]);
-    }
-    const amountIn = amounts[0];
-    return [amountIn, amountOut];
   }
 }
