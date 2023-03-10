@@ -1,6 +1,6 @@
 {
   "name": "@aymantaybi/dexclient",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "repository": "https://github.com/aymantaybi/dexclient",
   "description": "High performance client for all Decentralized Exchanges built on top of EVM compatible Blockchains",
   "main": "dist/index.js",
