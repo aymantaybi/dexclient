@@ -1,6 +1,6 @@
 import { WalletBase } from "web3-core";
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
-import { fromWei } from "web3-utils";
+import { fromWei, toChecksumAddress } from "web3-utils";
 import EventEmitter from "events";
 
 export class Account extends EventEmitter {
@@ -28,7 +28,7 @@ export class Account extends EventEmitter {
   }
 
   address() {
-    return this.wallet[0]?.address || undefined;
+    return toChecksumAddress(this.wallet[0]?.address) || undefined;
   }
 
   balance(raw: boolean = false) {
