@@ -21,13 +21,17 @@ export class Route {
     return amounts;
   }
 
+  getPair(tokens: [Token, Token]) {
+    return this.pairs.find((pair) => pair && tokens.every((token) => [pair.token0, pair.token1].includes(token.address)));
+  }
+
   getAmountsOut(amountIn: Decimal) {
     const amounts = [amountIn];
     for (let i = 0; i < this.path.length - 1; i++) {
       const tokenIn = this.path[i];
       const tokenOut = this.path[i + 1];
-      const pair = this.pairs[i];
-      if (!pair) throw Error(`Pair of tokens ${tokenIn.address},${tokenOut.address} is missing`);
+      const pair = this.getPair([tokenIn, tokenOut]);
+      if (!pair) throw Error(`Pair of tokens ${tokenIn.address} & ${tokenOut.address} is missing`);
       amounts[i + 1] = pair.amountOut(tokenIn.address, amounts[i]);
     }
     return amounts;
@@ -39,8 +43,8 @@ export class Route {
     for (let i = this.path.length - 1; i > 0; i--) {
       const tokenIn = this.path[i - 1];
       const tokenOut = this.path[i];
-      const pair = this.pairs[i - 1];
-      if (!pair) throw Error(`Pair of tokens ${tokenIn.address},${tokenOut.address} is missing`);
+      const pair = this.getPair([tokenIn, tokenOut]);
+      if (!pair) throw Error(`Pair of tokens ${tokenIn.address} & ${tokenOut.address} is missing`);
       amounts[i - 1] = pair.amountIn(tokenOut.address, amounts[i]);
     }
     return amounts;

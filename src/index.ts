@@ -84,18 +84,8 @@ export class Client {
     }
   }
 
-  getPairs(path: Token[]) {
-    const pairs = [];
-    for (let i = 0; i < path.length - 1; i++) {
-      const pair = this.getPair([path[i], path[i + 1]]);
-      pairs.push(pair);
-    }
-    return pairs;
-  }
-
   swap(path: Token[], amount: SwapAmount) {
-    const { fetcher, router } = this;
-    const pairs = this.getPairs(path);
+    const { fetcher, router, pairs } = this;
     const route = new Route({ path, pairs });
     const swap = new Swap({ router, fetcher, route }, amount);
     return swap;
