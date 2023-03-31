@@ -66,11 +66,17 @@ export class Swap {
     const { decimals: tokenInDecimals } = path[0];
     const { decimals: tokenOutDecimals } = path[path.length - 1];
     if (type === SwapType.EXACT_INPUT) {
-      const amountOutMin = new Decimal(1).minus(slippage).times(amountOut || 0);
+      const amountOutMin = new Decimal(1)
+        .minus(slippage)
+        .times(amountOut || 0)
+        .floor();
       parameters[0] = formatAmount(amountIn || 0, tokenInDecimals).toString();
       parameters[1] = formatAmount(amountOutMin || 0, tokenOutDecimals).toString();
     } else {
-      const amountInMax = new Decimal(1).plus(slippage).times(amountIn || 0);
+      const amountInMax = new Decimal(1)
+        .plus(slippage)
+        .times(amountIn || 0)
+        .ceil();
       parameters[0] = formatAmount(amountOut || 0, tokenOutDecimals).toString();
       parameters[1] = formatAmount(amountInMax || 0, tokenInDecimals).toString();
     }
