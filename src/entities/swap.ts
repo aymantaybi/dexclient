@@ -1,4 +1,5 @@
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
+import Decimal from "decimal.js";
 import { PromiEvent, TransactionConfig, TransactionReceipt } from "web3-core";
 import ABICoder from "web3-eth-abi";
 import { AbiItem } from "web3-utils";
@@ -41,8 +42,8 @@ export class Swap {
     });
   }
 
-  execute(type: SwapType, transactionConfig: TransactionConfig) {
-    const parameters = this.parameters(type);
+  execute(type: SwapType, transactionConfig: TransactionConfig, slippage = new Decimal(0.005)) {
+    const parameters = this.parameters(type, slippage);
     const from = parameters[3];
     const abiItem = type === SwapType.EXACT_INPUT ? swapExactTokensForTokens : swapTokensForExactTokens;
     const encodedFunctionCall = ABICoder.encodeFunctionCall(abiItem as AbiItem, parameters as any);
@@ -54,22 +55,22 @@ export class Swap {
     return transaction;
   }
 
-  parameters(type: SwapType) {
+  parameters(type: SwapType, slippage: Decimal) {
     const { path, amountIn, amountOut } = this.route;
     const to = this.fetcher.web3.eth.accounts.wallet[0]?.address;
     if (!to) {
       throw Error("Invalid 'to' parameter");
     }
-    const deadline = Math.round(Date.now() / 1000) + 600;
+    const deadline = Math.round(Date.now() / 1000) + 3600;
     const parameters: [string, string, string[], string, number] = ["0", "0", path.map((token) => token.address), to, deadline];
     const { decimals: tokenInDecimals } = path[0];
     const { decimals: tokenOutDecimals } = path[path.length - 1];
     if (type === SwapType.EXACT_INPUT) {
-      const amountOutMin = amountOut;
+      const amountOutMin = new Decimal(1).minus(slippage).times(amountOut || 0);
       parameters[0] = formatAmount(amountIn || 0, tokenInDecimals).toString();
       parameters[1] = formatAmount(amountOutMin || 0, tokenOutDecimals).toString();
     } else {
-      const amountInMax = amountIn;
+      const amountInMax = new Decimal(1).plus(slippage).times(amountIn || 0);
       parameters[0] = formatAmount(amountOut || 0, tokenOutDecimals).toString();
       parameters[1] = formatAmount(amountInMax || 0, tokenInDecimals).toString();
     }
