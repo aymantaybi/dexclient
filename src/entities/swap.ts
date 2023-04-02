@@ -17,14 +17,16 @@ export class Swap {
   fetcher: Fetcher;
   router: string;
   route: Route;
+  type: SwapType;
   transactionConfig: TransactionConfig | undefined;
   transactionHash: string | undefined;
   transactionReceipt: TransactionReceipt | undefined;
 
-  constructor({ fetcher, router, route }: { fetcher: Fetcher; router: string; route: Route }, amount: SwapAmount) {
+  constructor({ fetcher, router, route, type }: { fetcher: Fetcher; router: string; route: Route; type: SwapType }, amount: SwapAmount) {
     this.fetcher = fetcher;
     this.router = router;
     this.route = route;
+    this.type = type;
     this.route.amounts(amount);
   }
 
@@ -42,10 +44,10 @@ export class Swap {
     });
   }
 
-  execute(type: SwapType, transactionConfig: TransactionConfig, slippage = new Decimal(0.005)) {
-    const parameters = this.parameters(type, slippage);
+  execute(transactionConfig: TransactionConfig, slippage = new Decimal(0.005)) {
+    const parameters = this.parameters(slippage);
     const from = parameters[3];
-    const abiItem = type === SwapType.EXACT_INPUT ? swapExactTokensForTokens : swapTokensForExactTokens;
+    const abiItem = this.type === SwapType.EXACT_INPUT ? swapExactTokensForTokens : swapTokensForExactTokens;
     const encodedFunctionCall = ABICoder.encodeFunctionCall(abiItem as AbiItem, parameters as any);
     const to = this.router;
     const data = encodedFunctionCall;
@@ -55,7 +57,7 @@ export class Swap {
     return transaction;
   }
 
-  parameters(type: SwapType, slippage: Decimal) {
+  parameters(slippage: Decimal) {
     const { path, amountIn, amountOut } = this.route;
     const to = this.fetcher.web3.eth.accounts.wallet[0]?.address;
     if (!to) {
@@ -65,7 +67,7 @@ export class Swap {
     const parameters: [string, string, string[], string, number] = ["0", "0", path.map((token) => token.address), to, deadline];
     const { decimals: tokenInDecimals } = path[0];
     const { decimals: tokenOutDecimals } = path[path.length - 1];
-    if (type === SwapType.EXACT_INPUT) {
+    if (this.type === SwapType.EXACT_INPUT) {
       const amountOutMin = new Decimal(1)
         .minus(slippage)
         .times(amountOut || 0)

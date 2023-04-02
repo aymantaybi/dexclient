@@ -7,7 +7,7 @@ import { Account } from "./entities/account";
 import { Pair } from "./entities/pair";
 import { GetPairArgument, SwapAmount } from "./interfaces";
 import { isGetPairArgumentPairAddress } from "./helpers/customTypeGuards";
-import { Swap } from "./entities/swap";
+import { Swap, SwapType } from "./entities/swap";
 import { Route } from "./entities/route";
 
 export class Client {
@@ -84,10 +84,10 @@ export class Client {
     }
   }
 
-  swap(path: Token[], amount: SwapAmount) {
+  swap(path: Token[], type: SwapType, amount: SwapAmount) {
     const { fetcher, router, pairs } = this;
     const route = new Route({ path, pairs });
-    const swap = new Swap({ router, fetcher, route }, amount);
+    const swap = new Swap({ fetcher, router, route, type }, amount);
     return swap;
   }
 }
