@@ -51,7 +51,7 @@ export class Swap {
     const encodedFunctionCall = ABICoder.encodeFunctionCall(abiItem as AbiItem, parameters as any);
     const to = this.router;
     const data = encodedFunctionCall;
-    this.transactionConfig = { ...transactionConfig, from, to, data };
+    this.transactionConfig = { ...this.transactionConfig, ...transactionConfig, from, to, data };
     const transaction = this.fetcher.web3.eth.sendTransaction({ ...this.transactionConfig });
     this.addTransactionEventsListeners(transaction);
     return transaction;
