@@ -6,10 +6,10 @@ import { Token } from "./token";
 
 export class Route {
   path: Token[];
-  pairs: (Pair | undefined)[];
+  pairs: Pair[];
   amountIn: Decimal | undefined;
   amountOut: Decimal | undefined;
-  constructor({ path, pairs }: { path: Token[]; pairs: (Pair | undefined)[] }) {
+  constructor({ path, pairs }: { path: Token[]; pairs: Pair[] }) {
     this.path = path;
     this.pairs = pairs;
   }
@@ -38,7 +38,7 @@ export class Route {
   }
 
   getAmountsIn(amountOut: Decimal) {
-    const amounts = new Array(this.path.length);
+    const amounts: Decimal[] = new Array(this.path.length);
     amounts[this.path.length - 1] = amountOut;
     for (let i = this.path.length - 1; i > 0; i--) {
       const tokenIn = this.path[i - 1];
