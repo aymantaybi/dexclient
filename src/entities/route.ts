@@ -3,12 +3,13 @@ import { isSwapAmountIn } from "../helpers";
 import { SwapAmount } from "../interfaces";
 import { Pair } from "./pair";
 import { Token } from "./token";
+import { ZERO } from "../constants";
 
 export class Route {
   path: Token[];
   pairs: Pair[];
-  amountIn: Decimal | undefined;
-  amountOut: Decimal | undefined;
+  amountIn = ZERO;
+  amountOut = ZERO;
   constructor({ path, pairs }: { path: Token[]; pairs: Pair[] }) {
     this.path = path;
     this.pairs = pairs;

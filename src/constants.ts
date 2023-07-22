@@ -1,3 +1,5 @@
+import Decimal from "decimal.js";
+
 export const swapExactTokensForTokens = {
   inputs: [
     {
@@ -76,3 +78,5 @@ export const swapTokensForExactTokens = {
   stateMutability: "nonpayable",
   type: "function",
 };
+
+export const ZERO = new Decimal(0);
