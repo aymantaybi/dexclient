@@ -72,6 +72,7 @@ function getQuantities(total: number, notional: number) {
   await client.initialize();
 
   const tokens = await Promise.all(Object.values(tokensAddresses).map((tokenAddress) => client.addToken(tokenAddress)));
+
   const pairs = await Promise.all(Object.values(pairsAddresses).map((pairAddress) => client.addPair(pairAddress)));
 
   const path = [...tokens].reverse();

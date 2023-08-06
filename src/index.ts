@@ -1,25 +1,25 @@
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
-import { WebsocketProvider } from "web3-providers-ws";
+import { EthExecutionAPI, Web3BaseProvider } from "web3";
 import { toChecksumAddress } from "web3-utils";
-import { BlockHeader } from "web3-eth";
+import { BlockHeaderOutput } from "web3";
 import { Token } from "./entities/token";
 import { Account } from "./entities/account";
 import { Pair } from "./entities/pair";
 import { GetPairArgument, SwapAmount } from "./interfaces";
-import { isGetPairArgumentPairAddress } from "./helpers/customTypeGuards";
+import { isGetPairArgumentPairAddress } from "./helpers/typeGuards";
 import { Swap, SwapType } from "./entities/swap";
 import { Route } from "./entities/route";
 
 export class Client {
-  websocketProvider: WebsocketProvider;
+  websocketProvider: Web3BaseProvider<EthExecutionAPI>;
   router: string;
   fetcher: Fetcher;
   account: Account;
   tokens: Token[] = [];
   pairs: Pair[] = [];
-  blocksHeaders: BlockHeader[] = [];
+  blocksHeaders: BlockHeaderOutput[] = [];
 
-  constructor({ websocketProvider, router }: { websocketProvider: WebsocketProvider; router: string }) {
+  constructor({ websocketProvider, router }: { websocketProvider: Web3BaseProvider<EthExecutionAPI>; router: string }) {
     this.websocketProvider = websocketProvider;
     this.router = router;
     this.fetcher = new Fetcher({ websocketProvider });
@@ -34,8 +34,8 @@ export class Client {
       this.blocksHeaders.pop();
     });
     const currentBlock = await this.fetcher.web3.eth.getBlock("latest");
-    const previousBlock = await this.fetcher.web3.eth.getBlock(currentBlock.number - 1);
-    const blocks = [currentBlock, previousBlock];
+    const previousBlock = await this.fetcher.web3.eth.getBlock(Number(currentBlock.number) - 1);
+    const blocks = [currentBlock, previousBlock] as unknown as BlockHeaderOutput[];
     this.blocksHeaders = blocks;
   }
 

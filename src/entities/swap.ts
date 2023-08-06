@@ -1,12 +1,13 @@
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
 import Decimal from "decimal.js";
-import { PromiEvent, TransactionConfig, TransactionReceipt } from "web3-core";
-import ABICoder from "web3-eth-abi";
-import { AbiItem } from "web3-utils";
+import { encodeFunctionCall } from "web3-eth-abi";
 import { swapExactTokensForTokens, swapTokensForExactTokens } from "../constants";
 import { formatAmount } from "../helpers";
 import { SwapAmount } from "../interfaces";
 import { Route } from "./route";
+import { FMT_BYTES, FMT_NUMBER, Transaction, TransactionReceipt } from "web3";
+import { SendTransactionEvents } from "web3/lib/commonjs/eth.exports";
+import { Web3PromiEvent } from "web3-core";
 
 export enum SwapType {
   EXACT_INPUT,
@@ -18,7 +19,7 @@ export class Swap {
   router: string;
   route: Route;
   type: SwapType;
-  transactionConfig: TransactionConfig | undefined;
+  transactionConfig: Transaction | undefined;
   transactionHash: string | undefined;
   transactionReceipt: TransactionReceipt | undefined;
 
@@ -30,7 +31,15 @@ export class Swap {
     this.route.amounts(amount);
   }
 
-  private addTransactionEventsListeners(transaction: PromiEvent<TransactionReceipt>) {
+  private addTransactionEventsListeners(
+    transaction: Web3PromiEvent<
+      TransactionReceipt,
+      SendTransactionEvents<{
+        readonly number: FMT_NUMBER.BIGINT;
+        readonly bytes: FMT_BYTES.HEX;
+      }>
+    >
+  ) {
     transaction.once("transactionHash", (transactionHash) => {
       this.transactionHash = transactionHash;
     });
@@ -44,11 +53,11 @@ export class Swap {
     });
   }
 
-  execute(transactionConfig: TransactionConfig, slippage = new Decimal(0.005)) {
+  execute(transactionConfig: Transaction, slippage = new Decimal(0.005)) {
     const parameters = this.parameters(slippage);
     const from = parameters[3];
     const abiItem = this.type === SwapType.EXACT_INPUT ? swapExactTokensForTokens : swapTokensForExactTokens;
-    const encodedFunctionCall = ABICoder.encodeFunctionCall(abiItem as AbiItem, parameters as any);
+    const encodedFunctionCall = encodeFunctionCall(abiItem, parameters as any);
     const to = this.router;
     const data = encodedFunctionCall;
     this.transactionConfig = { ...this.transactionConfig, ...transactionConfig, from, to, data };

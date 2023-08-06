@@ -29,18 +29,20 @@ export class Pair {
   async initialize() {
     const reserves = await this.fetcher.contract.methods.getReserves().call();
     const { reserve0, reserve1 } = reserves;
-    [this.reserve0, this.reserve1] = [reserve0, reserve1];
+    [this.reserve0, this.reserve1] = [String(reserve0), String(reserve1)];
     this.fetcher.on("reservesUpdate", (data) => {
       const { reserve0, reserve1 } = data;
-      [this.reserve0, this.reserve1] = [reserve0, reserve1];
+      [this.reserve0, this.reserve1] = [String(reserve0), String(reserve1)];
     });
     return this;
   }
 
   reserves(raw: boolean = false) {
     if (raw) return [this.reserve0, this.reserve1];
-    const reserve0 = new Decimal(this.reserve0).dividedBy(Decimal.pow(10, this.tokens[0].decimals));
-    const reserve1 = new Decimal(this.reserve1).dividedBy(Decimal.pow(10, this.tokens[1].decimals));
+    const token0Decimals = Number(this.tokens[0].decimals);
+    const token1Decimals = Number(this.tokens[1].decimals);
+    const reserve0 = new Decimal(this.reserve0).dividedBy(Decimal.pow(10, token0Decimals));
+    const reserve1 = new Decimal(this.reserve1).dividedBy(Decimal.pow(10, token1Decimals));
     return [reserve0, reserve1];
   }
 

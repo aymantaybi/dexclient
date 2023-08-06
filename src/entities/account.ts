@@ -1,15 +1,15 @@
-import { WalletBase } from "web3-core";
+import { Wallet } from "web3-eth-accounts";
 import { Fetcher } from "@aymantaybi/dexclient-fetcher";
 import { fromWei, toChecksumAddress } from "web3-utils";
 import EventEmitter from "events";
 
 export class Account extends EventEmitter {
-  wallet: WalletBase;
+  wallet: Wallet;
   fetcher: Fetcher;
-  private rawBalance = "0";
-  nonce = 0;
+  private rawBalance = BigInt(0);
+  nonce = BigInt(0);
 
-  constructor({ wallet, fetcher }: { wallet: WalletBase; fetcher: Fetcher }) {
+  constructor({ wallet, fetcher }: { wallet: Wallet; fetcher: Fetcher }) {
     super();
     this.wallet = wallet;
     this.fetcher = fetcher;
@@ -22,19 +22,20 @@ export class Account extends EventEmitter {
     this.fetcher.on("newBlock", async (block) => {
       const address = this.address();
       if (!address) return;
-      if (!block.transactions.some(({ from, to }) => [from, to].includes(address))) return;
+      if (!block.transactions?.some(({ from, to }) => [from, to].includes(address))) return;
       this.updateAll(address);
     });
   }
 
   address() {
-    return toChecksumAddress(this.wallet[0]?.address) || undefined;
+    const address = this.wallet[0]?.address;
+    return address ? toChecksumAddress(address) : undefined;
   }
 
   balance(raw: boolean = false) {
     const { rawBalance } = this;
     if (raw) return rawBalance;
-    return fromWei(rawBalance);
+    return fromWei(rawBalance, "ether");
   }
 
   private async updateBalance(account: string) {
