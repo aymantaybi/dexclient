@@ -72,15 +72,15 @@ export class Swap {
         .minus(slippage)
         .times(amountOut || 0)
         .floor();
-      parameters[0] = formatAmount(amountIn || 0, tokenInDecimals).toString();
-      parameters[1] = formatAmount(amountOutMin || 0, tokenOutDecimals).toString();
+      parameters[0] = formatAmount(amountIn || 0, tokenInDecimals).toFixed(0);
+      parameters[1] = formatAmount(amountOutMin || 0, tokenOutDecimals).toFixed(0);
     } else {
       const amountInMax = new Decimal(1)
         .plus(slippage)
         .times(amountIn || 0)
         .ceil();
-      parameters[0] = formatAmount(amountOut || 0, tokenOutDecimals).toString();
-      parameters[1] = formatAmount(amountInMax || 0, tokenInDecimals).toString();
+      parameters[0] = formatAmount(amountOut || 0, tokenOutDecimals).toFixed(0);
+      parameters[1] = formatAmount(amountInMax || 0, tokenInDecimals).toFixed(0);
     }
     return parameters;
   }
